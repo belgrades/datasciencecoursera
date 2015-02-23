@@ -1,0 +1,135 @@
+---
+title: "Machine Learning Project"
+author: "Fernando Crema"
+date: "Sunday, February 22, 2015"
+output: html_document
+---
+# Bakground 
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: <http://groupware.les.inf.puc-rio.br/har> (see the section on the Weight Lifting Exercise Dataset). 
+
+## Loading libraries
+```{r warning = FALSE, message= FALSE}
+library(caret)
+library(rattle)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(party)
+```
+If you don't have the libraries: ```install.packages(library)```
+.
+
+## Setting seed for random numbers generators
+```{r}
+set.seed(230190)
+```
+
+## Getting the data using links provided by Data Science course
+
+We select the train and test **.csv** data according with the instructions. This is, however, a problem if the <cloudfront.net> site eliminates the files. 
+
+```{r}
+training_url <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testing_url <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+```
+
+## Reading data
+We read the data using read.csv command and we put cache=TRUE in r options so we download the data only once. We strongly recommend this feature.
+```{r echo = FALSE}
+option_1 = "NA"
+option_2 = "#DIV/0!"
+```
+```{r cache=TRUE}
+training <- read.csv(url(training_url), 
+                     na.strings=c(option_1, option_2,""))
+
+testing <- read.csv(url(testing_url), 
+                    na.strings=c(option_1, option_2,""))
+```
+# Partioning Data 
+It's common to partitionate the training data so we use a portion of it to test the models.
+We decided to give 70% to the training data and 30% to the test data. However, this number can, of course, change depending on the scientist. Using different % helps us to determine the better option to a certain problem.
+
+```{r}
+partition <- createDataPartition(y=training$classe, 
+                                 p=0.7, 
+                                 list=FALSE)
+real_training <- training[partition, ]
+real_testing <- training[-partition, ]
+```
+
+
+## Machine Learnig using Decision Tree
+
+### Model
+```{r cache=TRUE}
+
+model_decision_tree = rpart(classe ~ ., 
+                            data= real_training, 
+                            method="class")
+```
+
+### Plotting the model
+```{r cache=TRUE}
+rpart.plot(model_decision_tree, 
+           main="Classification Tree", 
+           extra=102, 
+           under=TRUE, 
+           faclen=0)
+
+```
+Sometimes when we use decision trees models we tend to overfit the data to the model because we have complex trees. On the other hand, there's no possible interpretation with this models unless we're experts on the dataset (and we aren't). In this case, we can **unserstand** how to use the model but there's no apparent logic.
+
+### Predicting with the model
+```{r cache=TRUE}
+prediction_decision_tree <- predict(model_decision_tree, 
+                                    real_testing, 
+                                    type = "class")
+
+confusionMatrix(prediction_decision_tree, real_testing$classe)
+```
+The accuracy of this model is around 85% which is, according to the next model, very low. However, this method is almost 10 times faster than random forest (in this case) so if we needed a real time predictor with real time data we should use this model.
+The confidence interval of this model with an alpha value of 0.05 is (0.8489, 0.8689). 
+
+## Machine Learning using Random Forests
+
+### The model
+```{r cache=TRUE}
+model_random_forest <- randomForest(classe ~. , 
+                                    data=real_training)
+```
+### Plotting the model
+We tried to use cforest command from the party library to plot the forest. However, it has too many trees (500). As a result, it's impossible to plot the model.
+However, this is only for visual effects. We can use the model.
+
+
+### Predicting with the model
+```{r cache = TRUE}
+prediction_random_forest <- predict(model_random_forest, real_testing, type = "class")
+
+confusionMatrix(prediction_random_forest, real_testing$classe)
+```
+The accuracy of this model gives us a confidence interval with alpha 0.05 from 0.9985 to 0.9999 which means this model is actually really good. However, we should be careful about overfitting. We don't apply preprocesing methods such as PCA to analyse this. 
+The tpical measures that we use such as sensitivity, specificity, positive pred value and negative pred value are near to 1.
+As a conclusion, we select this model according to the measures already described.
+
+# Predict the assigment:
+```{r}
+final <- predict(model_random_forest,
+                         testing,
+                         type = "class")
+final
+```
+
+# Generating files with the help:
+```{r}
+write_files = function(x){
+    n = length(x)
+    for(i in 1:n){
+        filename = paste("problem_id_",i,".txt")
+        write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+    }
+}
+
+write_files(final)
+```
